@@ -89,6 +89,9 @@ def run_inference(model: YOLO, records: List[ImageRecord], imgsz: int, device: s
                   conf: float, iou: float, batch: int) -> Tuple[List[Prediction], List]:
     # Ultralytics supports list of paths with batch inference
     img_paths = [str(r.path) for r in records]
+    # save=True will save the image with the bounding boxes drawn on it
+    # save_cropped=True will save the cropped image with the bounding boxes drawn on it
+    # save_text=True will save the label text in yolo format
     results = model.predict(source=img_paths, imgsz=imgsz, device=device, conf=conf, iou=iou,
                             batch=batch, verbose=False)
 
