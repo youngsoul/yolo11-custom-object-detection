@@ -18,7 +18,8 @@ Usage examples:
                          --test-root ./modeling_data/test \
                          --imgsz 640 --device mps --batch 16 --conf 0.25 --iou 0.7 \
                          --save-csv results.csv --save-confusion test_confusion.csv \
-                         --save-misclassified ./test_misclassified
+                         --save-misclassified ./test_misclassified \
+                         --test-images-boxes ./test_images_with_boxes
 
 Notes:
 - If an image has no detections above the confidence threshold, the predicted class is "__none__".
@@ -36,6 +37,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 from ultralytics import YOLO
+import cv2
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 NONE_CLASS = "__none__"  # used when no detection is found
@@ -84,7 +86,7 @@ def discover_classes_and_images(test_root: Path) -> Tuple[List[str], List[ImageR
 
 
 def run_inference(model: YOLO, records: List[ImageRecord], imgsz: int, device: str,
-                  conf: float, iou: float, batch: int) -> List[Prediction]:
+                  conf: float, iou: float, batch: int) -> Tuple[List[Prediction], List]:
     # Ultralytics supports list of paths with batch inference
     img_paths = [str(r.path) for r in records]
     results = model.predict(source=img_paths, imgsz=imgsz, device=device, conf=conf, iou=iou,
@@ -117,7 +119,7 @@ def run_inference(model: YOLO, records: List[ImageRecord], imgsz: int, device: s
             # If parsing fails for any reason, keep NONE_CLASS
             pass
         preds.append(Prediction(path=rec.path, expected=rec.expected, predicted=pred_class, confidence=pred_conf))
-    return preds
+    return preds, results
 
 
 def compute_metrics(classes: List[str], preds: List[Prediction]):
@@ -229,6 +231,24 @@ def copy_misclassified(preds: List[Prediction], out_dir: Path) -> None:
                 pass
 
 
+def save_annotated_images(records: List[ImageRecord], results: List, out_root: Path) -> None:
+    """Save images with predicted bounding boxes drawn.
+
+    The output directory will mirror the input structure: <out_root>/<expected>/images/<filename>.
+    """
+    out_root.mkdir(parents=True, exist_ok=True)
+    for rec, res in zip(records, results):
+        try:
+            annotated = res.plot()  # BGR numpy array with boxes/labels drawn
+            out_dir = out_root / rec.expected / "images"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / rec.path.name
+            cv2.imwrite(str(out_path), annotated)
+        except Exception:
+            # Skip silently on write/plot errors
+            continue
+
+
 def parse_args(argv: List[str] | None = None):
     ap = argparse.ArgumentParser(description="Evaluate a YOLOv11 model on class-organized test images.")
     ap.add_argument("--model", required=True, type=str, help="Path to trained YOLO model weights (e.g., best.pt)")
@@ -241,6 +261,7 @@ def parse_args(argv: List[str] | None = None):
     ap.add_argument("--save-csv", type=Path, default=None, help="Optional path to save per-image predictions CSV")
     ap.add_argument("--save-confusion", type=Path, default=None, help="Optional path to save confusion matrix CSV")
     ap.add_argument("--save-misclassified", type=Path, default=None, help="Optional folder to copy misclassified images")
+    ap.add_argument("--test-images-boxes", type=Path, default=None, help="If set, save annotated images with bounding boxes under this directory, preserving <class>/images structure")
     return ap.parse_args(argv)
 
 
@@ -251,7 +272,7 @@ def main(argv: List[str] | None = None) -> int:
 
     classes, records = discover_classes_and_images(args.test_root)
 
-    preds = run_inference(model=model,
+    preds, results = run_inference(model=model,
                           records=records,
                           imgsz=args.imgsz,
                           device=args.device,
@@ -272,6 +293,9 @@ def main(argv: List[str] | None = None) -> int:
     if args.save_misclassified:
         copy_misclassified(preds, Path(args.save_misclassified))
         print(f"Copied misclassified images under: {args.save_misclassified}")
+    if args.test_images_boxes:
+        save_annotated_images(records, results, Path(args.test_images_boxes))
+        print(f"Saved annotated images with boxes under: {args.test_images_boxes}")
 
     return 0
 
