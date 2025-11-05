@@ -1,0 +1,7 @@
+expected\predicted,bird,car,cat,dog,motorcycle,truck,__none__
+bird,5,0,0,0,0,0,0
+car,0,5,0,0,0,0,0
+cat,0,0,6,0,0,0,0
+dog,0,0,0,6,0,0,0
+motorcycle,0,0,0,0,6,0,0
+truck,0,0,0,0,0,5,0
