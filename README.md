@@ -1,6 +1,9 @@
-# Ultralytics Yolo11 Custom Object Detection
+# Ultralytics Yolo11/Yolo26 Custom Object Detection
 
-Repo contains an example of how to train a custom Yolo11 object detection model
+Repo contains an example of how to train a custom Yolo11 or Yolo26 object detection model.
+
+Inside 'train_yolov11.py' update the yolo_model_number variable to either 11 or 26 depending on which model you want to train.
+
 
 ## Assumptions
 
